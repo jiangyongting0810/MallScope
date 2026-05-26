@@ -1,0 +1,55 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background: linear-gradient(160deg, #fff8ef, #f7efe5);
+  color: #2c2218;
+}
+
+.popup {
+  width: 340px;
+  padding: 16px;
+}
+
+.popup__title {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.popup__hint {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.popup__button {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #d9480f, #f76707);
+  cursor: pointer;
+}
+
+.popup__button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.popup__status {
+  margin: 12px 0 0;
+  padding: 12px;
+  min-height: 92px;
+  overflow: auto;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}

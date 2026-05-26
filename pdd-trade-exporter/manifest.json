@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "\u62fc\u591a\u591a\u4ea4\u6613\u6570\u636e\u5bfc\u51fa\u52a9\u624b",
+  "version": "0.1.0",
+  "description": "\u5bfc\u51fa\u62fc\u591a\u591a\u4ea4\u6613\u6570\u636e\u9875\u7684\u5f53\u524d\u6570\u636e\u4e3a CSV\u3002",
+  "permissions": [
+    "activeTab",
+    "downloads",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://mms.pinduoduo.com/*"
+  ],
+  "action": {
+    "default_title": "\u62fc\u591a\u591a\u4ea4\u6613\u6570\u636e\u5bfc\u51fa\u52a9\u624b",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mms.pinduoduo.com/sycm/stores_data/operation*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://mms.pinduoduo.com/sycm/stores_data/operation*"
+      ],
+      "js": [
+        "page-main.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}
