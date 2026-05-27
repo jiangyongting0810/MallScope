@@ -14,7 +14,17 @@
   ],
   "action": {
     "default_title": "\u62fc\u591a\u591a\u4ea4\u6613\u6570\u636e\u5bfc\u51fa\u52a9\u624b",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "32": "assets/icon-32.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
   },
   "content_scripts": [
     {
