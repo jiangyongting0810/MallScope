@@ -46,8 +46,18 @@ const PAGE_CONFIGS = [
     displayName: "\u5546\u54c1\u6570\u636e\u9875",
     responseMode: "summaryYesterdayObject",
     metrics: [
-      { key: "visitorCount", label: "\u5546\u54c1\u8bbf\u5ba2\u6570", type: "count", field: "uv" },
-      { key: "goodsViewCount", label: "\u5546\u54c1\u6d4f\u89c8\u91cf", type: "count", field: "gpv" }
+      {
+        key: "visitorCount",
+        label: "\u5546\u54c1\u8bbf\u5ba2\u6570",
+        type: "count",
+        fields: ["guv", "uv", "goodsUv", "visitorCnt", "visitorCount", "goodsVisitorCnt", "goodsVisitorCount"]
+      },
+      {
+        key: "goodsViewCount",
+        label: "\u5546\u54c1\u6d4f\u89c8\u91cf",
+        type: "count",
+        fields: ["gpv", "goodsGpv", "viewCnt", "viewCount", "goodsViewCnt", "goodsViewCount"]
+      }
     ]
   }
 ];
@@ -89,6 +99,38 @@ function parseMetricValue(value) {
   return null;
 }
 
+function getMetricFields(metric) {
+  if (Array.isArray(metric?.fields) && metric.fields.length > 0) {
+    return metric.fields;
+  }
+
+  return metric?.field ? [metric.field] : [];
+}
+
+function resolveMetricValue(entry, metric) {
+  if (!entry || !metric) {
+    return {
+      field: null,
+      value: null
+    };
+  }
+
+  for (const field of getMetricFields(metric)) {
+    const value = entry?.[field];
+    if (parseMetricValue(value) !== null) {
+      return {
+        field,
+        value
+      };
+    }
+  }
+
+  return {
+    field: getMetricFields(metric)[0] || null,
+    value: null
+  };
+}
+
 function isValidMetricValue(value) {
   return parseMetricValue(value) !== null;
 }
@@ -121,11 +163,11 @@ function selectYesterdayEntry(config, result) {
       return null;
     }
 
-    const hasAnyMetric = config.metrics.some((metric) => isValidMetricValue(candidate?.[metric.field]));
+    const hasAnyMetric = config.metrics.some((metric) => parseMetricValue(resolveMetricValue(candidate, metric).value) !== null);
     return hasAnyMetric ? candidate : null;
   }
 
-  const metricFields = config.metrics.map((metric) => metric.field);
+  const metricFields = config.metrics.flatMap((metric) => getMetricFields(metric));
   return selectLatestYesterdayEntry(result?.yesterdayRtList, metricFields);
 }
 
@@ -437,11 +479,14 @@ function storeGoodsSnapshot(config, detail) {
   }
 
   const metrics = {};
+  const resolvedFields = {};
   for (const metric of config.metrics) {
+    const resolved = resolveMetricValue(latestYesterdayEntry, metric);
     metrics[metric.key] = {
       label: metric.label,
-      ...formatMetricValue(metric.type, latestYesterdayEntry[metric.field])
+      ...formatMetricValue(metric.type, resolved.value)
     };
+    resolvedFields[metric.key] = resolved.field;
   }
 
   pageSnapshots.set(config.id, {
@@ -450,7 +495,8 @@ function storeGoodsSnapshot(config, detail) {
     requestUrl: detail.url,
     capturedAt: detail.capturedAt,
     metrics,
-    rawEntry: latestYesterdayEntry
+    rawEntry: latestYesterdayEntry,
+    resolvedFields
   });
 }
 
@@ -615,7 +661,9 @@ function extractCurrentPageData() {
     debug: {
       requestUrl: snapshot.requestUrl,
       hr: snapshot.rawEntry.hr,
-      configId: snapshot.configId
+      configId: snapshot.configId,
+      resolvedFields: snapshot.resolvedFields || null,
+      rawKeys: snapshot.rawEntry ? Object.keys(snapshot.rawEntry) : []
     }
   };
 }
