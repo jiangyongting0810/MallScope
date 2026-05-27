@@ -18,11 +18,14 @@ const SUPPORTED_URL_PREFIXES = PAGE_ORDER.map((page) => page.prefix);
 
 const TEXT = {
   csvHeaders: [
-    "\u91c7\u96c6\u65f6\u95f4",
-    "\u9875\u9762\u540d\u79f0",
-    "\u9875\u9762\u5730\u5740",
-    "\u6307\u6807\u6807\u7b7e",
-    "\u6307\u6807\u503c"
+    "\u6570\u636e\u65e5\u671f",
+    "\u6210\u4ea4\u91d1\u989d",
+    "\u6210\u4ea4\u8ba2\u5355\u6570",
+    "\u5ba2\u5355\u4ef7",
+    "\u8bbf\u5ba2\u4ef7\u503c",
+    "\u6210\u4ea4\u8f6c\u5316\u7387",
+    "\u5546\u54c1\u8bbf\u5ba2\u6570",
+    "\u5546\u54c1\u6d4f\u89c8\u91cf"
   ],
   exportFilePrefix: "\u62fc\u591a\u591a\u6628\u65e5\u6570\u636e",
   checkingTabs: "\u6b63\u5728\u68c0\u67e5\u5df2\u6253\u5f00\u7684\u6570\u636e\u9875...",
@@ -59,20 +62,34 @@ function createCsv(rows) {
     .join("\r\n");
 }
 
+function formatDataDate(capturedAt) {
+  const date = new Date(capturedAt);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  date.setDate(date.getDate() - 1);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${month}-${day}`;
+}
+
 function buildMetricRows(payloads) {
   const rows = [TEXT.csvHeaders];
+  const tradePayload = payloads.find((payload) => payload.debug?.configId === "trade") || null;
+  const goodsPayload = payloads.find((payload) => payload.debug?.configId === "goods") || null;
+  const baseCapturedAt = tradePayload?.capturedAt || goodsPayload?.capturedAt || "";
 
-  for (const payload of payloads) {
-    for (const metric of Object.values(payload.metrics)) {
-      rows.push([
-        payload.capturedAt,
-        payload.pageName,
-        payload.pageUrl,
-        metric.label,
-        metric.raw
-      ]);
-    }
-  }
+  rows.push([
+    formatDataDate(baseCapturedAt),
+    tradePayload?.metrics?.payAmount?.raw || "",
+    tradePayload?.metrics?.payOrderCount?.raw || "",
+    tradePayload?.metrics?.customerUnitPrice?.raw || "",
+    tradePayload?.metrics?.visitorValue?.raw || "",
+    tradePayload?.metrics?.conversionRate?.raw || "",
+    goodsPayload?.metrics?.visitorCount?.raw || "",
+    goodsPayload?.metrics?.goodsViewCount?.raw || ""
+  ]);
 
   return rows;
 }
