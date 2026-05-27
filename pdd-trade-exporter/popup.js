@@ -23,6 +23,7 @@ const PAGE_ORDER = [
 ];
 
 const SUPPORTED_URL_PREFIXES = PAGE_ORDER.map((page) => page.prefix);
+const PAGE_BY_ID = new Map(PAGE_ORDER.map((page) => [page.id, page]));
 
 const TEXT = {
   csvHeaders: [
@@ -166,7 +167,7 @@ function buildMetricRows(payloads) {
   return rows;
 }
 
-function buildPromotionRows(promotionPayload, tradePayload) {
+function buildPromotionRows(promotionPayload) {
   const marketingSpendRaw = promotionPayload?.metrics?.marketingSpend?.raw || "";
   const netGmvRaw = promotionPayload?.metrics?.netGmv?.raw || "";
   const actualRoiRaw = promotionPayload?.metrics?.actualRoi?.raw || "";
@@ -179,7 +180,7 @@ function buildPromotionRows(promotionPayload, tradePayload) {
   return [
     TEXT.promotionCsvHeaders,
     [
-      formatDataDate(promotionPayload?.capturedAt || tradePayload?.capturedAt || ""),
+      formatDataDate(promotionPayload?.capturedAt || ""),
       marketingSpendRaw,
       netGmvRaw,
       actualRoiRaw,
@@ -302,7 +303,11 @@ function formatMetricSummary(payload) {
 
 async function getSupportedTabs() {
   const tabs = await chrome.tabs.query({});
-  return tabs.filter((tab) => tab.id && tab.url && isSupportedPage(tab.url));
+  return tabs.filter((tab) => Number.isInteger(tab.id) && tab.url && isSupportedPage(tab.url));
+}
+
+async function getPageTabs() {
+  return pickTabsByPage(await getSupportedTabs());
 }
 
 function wait(ms) {
@@ -322,6 +327,24 @@ function pickTabsByPage(tabs) {
   return pageTabs;
 }
 
+function assertPagesOpen(pageTabs, pages = PAGE_ORDER) {
+  if (pages === PAGE_ORDER && pages.every((page) => !pageTabs.get(page.id))) {
+    throw new Error(TEXT.openAllPages);
+  }
+
+  const missingPageMessages = {
+    trade: TEXT.missingTradePage,
+    goods: TEXT.missingGoodsPage,
+    promotion: TEXT.missingPromotionPage
+  };
+
+  for (const page of pages) {
+    if (!pageTabs.get(page.id)) {
+      throw new Error(missingPageMessages[page.id]);
+    }
+  }
+}
+
 async function extractFromTab(tab, page) {
   const response = await sendMessage(tab.id, "extract-trade-data");
   if (!response) {
@@ -336,24 +359,8 @@ async function extractFromTab(tab, page) {
 }
 
 async function collectAllPageData() {
-  const supportedTabs = await getSupportedTabs();
-  const pageTabs = pickTabsByPage(supportedTabs);
-
-  if (!pageTabs.get("trade") && !pageTabs.get("goods") && !pageTabs.get("promotion")) {
-    throw new Error(TEXT.openAllPages);
-  }
-
-  if (!pageTabs.get("trade")) {
-    throw new Error(TEXT.missingTradePage);
-  }
-
-  if (!pageTabs.get("goods")) {
-    throw new Error(TEXT.missingGoodsPage);
-  }
-
-  if (!pageTabs.get("promotion")) {
-    throw new Error(TEXT.missingPromotionPage);
-  }
+  const pageTabs = await getPageTabs();
+  assertPagesOpen(pageTabs);
 
   const payloads = [];
   for (const page of PAGE_ORDER) {
@@ -364,14 +371,13 @@ async function collectAllPageData() {
 }
 
 async function openAllPages() {
-  const supportedTabs = await getSupportedTabs();
-  const pageTabs = pickTabsByPage(supportedTabs);
+  const pageTabs = await getPageTabs();
   const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const activeIndex = activeTabs[0]?.index ?? 0;
   let insertIndex = activeIndex + 1;
 
   for (const page of PAGE_ORDER) {
-    if (pageTabs.get(page.id)?.id) {
+    if (pageTabs.get(page.id)) {
       continue;
     }
 
@@ -386,24 +392,8 @@ async function openAllPages() {
 }
 
 async function refreshAllPages() {
-  const supportedTabs = await getSupportedTabs();
-  const pageTabs = pickTabsByPage(supportedTabs);
-
-  if (!pageTabs.get("trade") && !pageTabs.get("goods") && !pageTabs.get("promotion")) {
-    throw new Error(TEXT.openAllPages);
-  }
-
-  if (!pageTabs.get("trade")) {
-    throw new Error(TEXT.missingTradePage);
-  }
-
-  if (!pageTabs.get("goods")) {
-    throw new Error(TEXT.missingGoodsPage);
-  }
-
-  if (!pageTabs.get("promotion")) {
-    throw new Error(TEXT.missingPromotionPage);
-  }
+  const pageTabs = await getPageTabs();
+  assertPagesOpen(pageTabs);
 
   await Promise.all(
     PAGE_ORDER.map((page) => chrome.tabs.reload(pageTabs.get(page.id).id))
@@ -476,20 +466,11 @@ async function handlePromotionExport() {
   setStatus(TEXT.requestingPromotionData);
 
   try {
-    const supportedTabs = await getSupportedTabs();
-    const pageTabs = pickTabsByPage(supportedTabs);
-    const promotionTab = pageTabs.get("promotion");
-    if (!promotionTab) {
-      throw new Error(TEXT.missingPromotionPage);
-    }
-
-    const promotionPayload = await extractFromTab(promotionTab, PAGE_ORDER.find((page) => page.id === "promotion"));
+    const pageTabs = await getPageTabs();
+    const promotionPage = PAGE_BY_ID.get("promotion");
+    assertPagesOpen(pageTabs, [promotionPage]);
+    const promotionPayload = await extractFromTab(pageTabs.get("promotion"), promotionPage);
     validatePromotionExportPayload(promotionPayload);
-    let tradePayload = null;
-    const tradeTab = pageTabs.get("trade");
-    if (tradeTab) {
-      tradePayload = await extractFromTab(tradeTab, PAGE_ORDER.find((page) => page.id === "trade"));
-    }
 
     const statusLines = [
       TEXT.success,
@@ -497,12 +478,9 @@ async function handlePromotionExport() {
       formatMetricSummary(promotionPayload),
       ...formatSuccessDebug(promotionPayload)
     ];
-    if (!tradePayload) {
-      tradePayload = null;
-    }
     setStatus(statusLines.join("\n"));
     downloadCsv(
-      buildPromotionRows(promotionPayload, tradePayload),
+      buildPromotionRows(promotionPayload),
       TEXT.promotionExportFilePrefix,
       promotionPayload?.capturedAt || ""
     );
