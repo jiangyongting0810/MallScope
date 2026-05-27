@@ -1,3 +1,5 @@
+const openPagesButton = document.getElementById("openPagesButton");
+const refreshPagesButton = document.getElementById("refreshPagesButton");
 const exportButton = document.getElementById("exportButton");
 const statusNode = document.getElementById("status");
 
@@ -32,12 +34,14 @@ const TEXT = {
     "\u5546\u54c1\u8bbf\u5ba2\u6570",
     "\u5546\u54c1\u6d4f\u89c8\u91cf",
     "\u6210\u4ea4\u8425\u9500\u82b1\u8d39(\u5143)",
-    "\u51c0\u4ea4\u6613\u989d(\u5143)",
-    "\u5b9e\u9645\u51c0\u6295\u4ea7\u6bd4"
+    "\u5b9e\u9645\u51c0\u6295\u4ea7\u6bd4",
+    "\u5e7f\u544a\u8d39\u7387"
   ],
   exportFilePrefix: "\u62fc\u591a\u591a\u6628\u65e5\u6570\u636e",
   checkingTabs: "\u6b63\u5728\u68c0\u67e5\u5df2\u6253\u5f00\u7684\u6570\u636e\u9875...",
   requestingAllData: "\u6b63\u5728\u8bf7\u6c42\u4e09\u4e2a\u9875\u9762\u7684\u91c7\u96c6\u6570\u636e...",
+  openingPages: "\u6b63\u5728\u6253\u5f00\u4e09\u4e2a\u6570\u636e\u9875...",
+  refreshingPages: "\u6b63\u5728\u5237\u65b0\u4e09\u4e2a\u6570\u636e\u9875...",
   noContentResponse: "\u5185\u5bb9\u811a\u672c\u6ca1\u6709\u8fd4\u56de\u7ed3\u679c\u3002",
   extractionFailed: "\u91c7\u96c6\u5931\u8d25\u3002",
   success: "\u91c7\u96c6\u6210\u529f\uff0c\u6b63\u5728\u51c6\u5907\u5bfc\u51fa\u3002",
@@ -55,11 +59,19 @@ const TEXT = {
   missingPromotionPage: "\u672a\u627e\u5230\u5df2\u6253\u5f00\u7684\u63a8\u5e7f\u6570\u636e\u9875\u6807\u7b7e\u9875\u3002",
   tradeSummary: "\u4ea4\u6613\u9875\u6982\u8981",
   goodsSummary: "\u5546\u54c1\u9875\u6982\u8981",
-  promotionSummary: "\u63a8\u5e7f\u9875\u6982\u8981"
+  promotionSummary: "\u63a8\u5e7f\u9875\u6982\u8981",
+  pagesOpened: "\u4e09\u4e2a\u9875\u9762\u5df2\u6253\u5f00\u3002",
+  pagesRefreshed: "\u4e09\u4e2a\u9875\u9762\u5df2\u53d1\u8d77\u5237\u65b0\u3002"
 };
 
 function setStatus(message) {
   statusNode.textContent = message;
+}
+
+function setButtonsDisabled(disabled) {
+  openPagesButton.disabled = disabled;
+  refreshPagesButton.disabled = disabled;
+  exportButton.disabled = disabled;
 }
 
 function createCsv(rows) {
@@ -84,25 +96,55 @@ function formatDataDate(capturedAt) {
   return `${month}-${day}`;
 }
 
+function parseNumber(value) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/,/g, "").replace(/%$/, "");
+    if (!normalized) {
+      return null;
+    }
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function formatAdRate(marketingSpendRaw, payAmountRaw) {
+  const marketingSpend = parseNumber(marketingSpendRaw);
+  const payAmount = parseNumber(payAmountRaw);
+  if (marketingSpend === null || payAmount === null || payAmount === 0) {
+    return "";
+  }
+
+  return `${((marketingSpend / payAmount) * 100).toFixed(2)}%`;
+}
+
 function buildMetricRows(payloads) {
   const rows = [TEXT.csvHeaders];
   const tradePayload = payloads.find((payload) => payload.debug?.configId === "trade") || null;
   const goodsPayload = payloads.find((payload) => payload.debug?.configId === "goods") || null;
   const promotionPayload = payloads.find((payload) => payload.debug?.configId === "promotion") || null;
   const baseCapturedAt = tradePayload?.capturedAt || goodsPayload?.capturedAt || "";
+  const payAmountRaw = tradePayload?.metrics?.payAmount?.raw || "";
+  const marketingSpendRaw = promotionPayload?.metrics?.marketingSpend?.raw || "";
 
   rows.push([
     formatDataDate(baseCapturedAt),
-    tradePayload?.metrics?.payAmount?.raw || "",
+    payAmountRaw,
     tradePayload?.metrics?.payOrderCount?.raw || "",
     tradePayload?.metrics?.customerUnitPrice?.raw || "",
     tradePayload?.metrics?.visitorValue?.raw || "",
     tradePayload?.metrics?.conversionRate?.raw || "",
     goodsPayload?.metrics?.visitorCount?.raw || "",
     goodsPayload?.metrics?.goodsViewCount?.raw || "",
-    promotionPayload?.metrics?.marketingSpend?.raw || "",
-    promotionPayload?.metrics?.netGmv?.raw || "",
-    promotionPayload?.metrics?.netRoi?.raw || ""
+    marketingSpendRaw,
+    promotionPayload?.metrics?.netRoi?.raw || "",
+    formatAdRate(marketingSpendRaw, payAmountRaw)
   ]);
 
   return rows;
@@ -208,6 +250,12 @@ async function getSupportedTabs() {
   return tabs.filter((tab) => tab.id && tab.url && isSupportedPage(tab.url));
 }
 
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 function pickTabsByPage(tabs) {
   const pageTabs = new Map();
 
@@ -260,8 +308,84 @@ async function collectAllPageData() {
   return payloads;
 }
 
+async function openAllPages() {
+  const supportedTabs = await getSupportedTabs();
+  const pageTabs = pickTabsByPage(supportedTabs);
+  const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const activeIndex = activeTabs[0]?.index ?? 0;
+  let insertIndex = activeIndex + 1;
+
+  for (const page of PAGE_ORDER) {
+    if (pageTabs.get(page.id)?.id) {
+      continue;
+    }
+
+    const createdTab = await chrome.tabs.create({
+      url: page.prefix,
+      active: false,
+      index: insertIndex
+    });
+    pageTabs.set(page.id, createdTab);
+    insertIndex += 1;
+  }
+}
+
+async function refreshAllPages() {
+  const supportedTabs = await getSupportedTabs();
+  const pageTabs = pickTabsByPage(supportedTabs);
+
+  if (!pageTabs.get("trade") && !pageTabs.get("goods") && !pageTabs.get("promotion")) {
+    throw new Error(TEXT.openAllPages);
+  }
+
+  if (!pageTabs.get("trade")) {
+    throw new Error(TEXT.missingTradePage);
+  }
+
+  if (!pageTabs.get("goods")) {
+    throw new Error(TEXT.missingGoodsPage);
+  }
+
+  if (!pageTabs.get("promotion")) {
+    throw new Error(TEXT.missingPromotionPage);
+  }
+
+  await Promise.all(
+    PAGE_ORDER.map((page) => chrome.tabs.reload(pageTabs.get(page.id).id))
+  );
+}
+
+async function handleOpenPages() {
+  setButtonsDisabled(true);
+  setStatus(TEXT.openingPages);
+
+  try {
+    await openAllPages();
+    setStatus(TEXT.pagesOpened);
+  } catch (error) {
+    setStatus(`${TEXT.failed}\n${error.message}`);
+  } finally {
+    setButtonsDisabled(false);
+  }
+}
+
+async function handleRefreshPages() {
+  setButtonsDisabled(true);
+  setStatus(TEXT.refreshingPages);
+
+  try {
+    await refreshAllPages();
+    await wait(800);
+    setStatus(TEXT.pagesRefreshed);
+  } catch (error) {
+    setStatus(`${TEXT.failed}\n${error.message}`);
+  } finally {
+    setButtonsDisabled(false);
+  }
+}
+
 async function handleExport() {
-  exportButton.disabled = true;
+  setButtonsDisabled(true);
   setStatus(TEXT.checkingTabs);
 
   try {
@@ -285,10 +409,12 @@ async function handleExport() {
   } catch (error) {
     setStatus(`${TEXT.failed}\n${error.message}`);
   } finally {
-    exportButton.disabled = false;
+    setButtonsDisabled(false);
   }
 }
 
+openPagesButton.addEventListener("click", handleOpenPages);
+refreshPagesButton.addEventListener("click", handleRefreshPages);
 exportButton.addEventListener("click", handleExport);
 
 document.addEventListener("DOMContentLoaded", async () => {

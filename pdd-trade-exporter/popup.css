@@ -37,6 +37,17 @@ body {
   cursor: pointer;
 }
 
+.popup__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.popup__button--secondary {
+  color: #7a3412;
+  background: linear-gradient(135deg, #fff1e6, #ffe8cc);
+  border: 1px solid rgba(217, 72, 15, 0.18);
+}
+
 .popup__button:disabled {
   opacity: 0.65;
   cursor: progress;
