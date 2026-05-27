@@ -1,5 +1,9 @@
 (function () {
-  const TARGET_URL_PART = "/api/mallTrade/queryMallTradeList";
+  const TARGET_API_PARTS = [
+    "/api/mallTrade/queryMallTradeList",
+    "/api/mallTrade/getMallTradeInfo",
+    "/sydney/api/goodsDataShow/queryGoodsPageOverviewForMms"
+  ];
   const MESSAGE_TYPE = "PDD_TRADE_EXPORTER_DATA";
 
   function cloneForMessage(detail) {
@@ -10,8 +14,12 @@
     }
   }
 
+  function isTargetRequest(url) {
+    return TARGET_API_PARTS.some((part) => url?.includes(part));
+  }
+
   function dispatchPayload(source, url, payload) {
-    if (!url || !url.includes(TARGET_URL_PART)) {
+    if (!isTargetRequest(url)) {
       return;
     }
 

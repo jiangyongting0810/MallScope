@@ -18,7 +18,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://mms.pinduoduo.com/sycm/stores_data/operation*"
+        "https://mms.pinduoduo.com/sycm/stores_data/operation*",
+        "https://mms.pinduoduo.com/sycm/goods_effect*"
       ],
       "js": [
         "content.js"
@@ -27,7 +28,8 @@
     },
     {
       "matches": [
-        "https://mms.pinduoduo.com/sycm/stores_data/operation*"
+        "https://mms.pinduoduo.com/sycm/stores_data/operation*",
+        "https://mms.pinduoduo.com/sycm/goods_effect*"
       ],
       "js": [
         "page-main.js"
