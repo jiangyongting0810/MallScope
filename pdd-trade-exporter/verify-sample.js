@@ -155,7 +155,13 @@ function verifyPromotionDailyReport() {
         dailyReport: {
           orderMarketingSpend: { value: "141.91" },
           netGmv: { value: "382.00" },
-          orderSpendNetRoi: { value: "2.69" }
+          orderSpendNetRoi: { value: "2.69" },
+          orderSpendRoiUnified: { value: "2.69" },
+          orderNum: 3,
+          orderSpendNetCostPerOrder: { value: "47.30" },
+          impression: 784,
+          click: 24,
+          cvr: { value: "12.50" }
         }
       }
     },
@@ -193,8 +199,32 @@ function verifyPromotionDailyReport() {
     throw new Error(`净交易额校验失败，期望 382.00，实际 ${result.metrics.netGmv.raw}`);
   }
 
+  if (result.metrics.actualRoi.raw !== "2.69") {
+    throw new Error(`实际投产比校验失败，期望 2.69，实际 ${result.metrics.actualRoi.raw}`);
+  }
+
   if (result.metrics.netRoi.raw !== "2.69") {
     throw new Error(`实际净投产比校验失败，期望 2.69，实际 ${result.metrics.netRoi.raw}`);
+  }
+
+  if (result.metrics.orderCount.raw !== "3") {
+    throw new Error(`成交笔数校验失败，期望 3，实际 ${result.metrics.orderCount.raw}`);
+  }
+
+  if (result.metrics.netCostPerOrder.raw !== "47.30") {
+    throw new Error(`每笔净成交花费校验失败，期望 47.30，实际 ${result.metrics.netCostPerOrder.raw}`);
+  }
+
+  if (result.metrics.impression.raw !== "784") {
+    throw new Error(`曝光量校验失败，期望 784，实际 ${result.metrics.impression.raw}`);
+  }
+
+  if (result.metrics.click.raw !== "24") {
+    throw new Error(`点击量校验失败，期望 24，实际 ${result.metrics.click.raw}`);
+  }
+
+  if (result.metrics.clickConversionRate.raw !== "12.50%") {
+    throw new Error(`点击转化率校验失败，期望 12.50%，实际 ${result.metrics.clickConversionRate.raw}`);
   }
 }
 

@@ -69,7 +69,13 @@ const PAGE_CONFIGS = [
     metrics: [
       { key: "marketingSpend", label: "\u6210\u4ea4\u8425\u9500\u82b1\u8d39(\u5143)", type: "number", field: "orderMarketingSpend" },
       { key: "netGmv", label: "\u51c0\u4ea4\u6613\u989d(\u5143)", type: "number", field: "netGmv" },
-      { key: "netRoi", label: "\u5b9e\u9645\u51c0\u6295\u4ea7\u6bd4", type: "number", field: "orderSpendNetRoi" }
+      { key: "netRoi", label: "\u5b9e\u9645\u51c0\u6295\u4ea7\u6bd4", type: "number", field: "orderSpendNetRoi" },
+      { key: "actualRoi", label: "\u5b9e\u9645\u6295\u4ea7\u6bd4", type: "number", field: "orderSpendRoiUnified" },
+      { key: "orderCount", label: "\u6210\u4ea4\u7b14\u6570", type: "count", field: "orderNum" },
+      { key: "netCostPerOrder", label: "\u6bcf\u7b14\u51c0\u6210\u4ea4\u82b1\u8d39(\u5143)", type: "number", field: "orderSpendNetCostPerOrder" },
+      { key: "impression", label: "\u66dd\u5149\u91cf", type: "count", field: "impression" },
+      { key: "click", label: "\u70b9\u51fb\u91cf", type: "count", field: "click" },
+      { key: "clickConversionRate", label: "\u70b9\u51fb\u8f6c\u5316\u7387", type: "percentWhole", field: "cvr" }
     ]
   }
 ];
@@ -563,6 +569,13 @@ function formatMetricValue(type, value) {
   if (type === "percent") {
     return {
       raw: `${(parsedValue * 100).toFixed(2)}%`,
+      value: parsedValue
+    };
+  }
+
+  if (type === "percentWhole") {
+    return {
+      raw: `${parsedValue.toFixed(2)}%`,
       value: parsedValue
     };
   }

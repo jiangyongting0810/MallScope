@@ -1,5 +1,6 @@
 const openPagesButton = document.getElementById("openPagesButton");
 const refreshPagesButton = document.getElementById("refreshPagesButton");
+const exportPromotionButton = document.getElementById("exportPromotionButton");
 const exportButton = document.getElementById("exportButton");
 const statusNode = document.getElementById("status");
 
@@ -37,9 +38,22 @@ const TEXT = {
     "\u5b9e\u9645\u51c0\u6295\u4ea7\u6bd4",
     "\u5e7f\u544a\u8d39\u7387"
   ],
+  promotionCsvHeaders: [
+    "\u6570\u636e\u65e5\u671f",
+    "\u6210\u4ea4\u8425\u9500\u82b1\u8d39(\u5143)",
+    "\u51c0\u4ea4\u6613\u989d(\u5143)",
+    "\u5b9e\u9645\u6295\u4ea7\u6bd4",
+    "\u6210\u4ea4\u7b14\u6570",
+    "\u6bcf\u7b14\u51c0\u6210\u4ea4\u82b1\u8d39(\u5143)",
+    "\u66dd\u5149\u91cf",
+    "\u70b9\u51fb\u91cf",
+    "\u70b9\u51fb\u8f6c\u5316\u7387"
+  ],
   exportFilePrefix: "\u62fc\u591a\u591a\u6628\u65e5\u6570\u636e",
+  promotionExportFilePrefix: "\u62fc\u591a\u591a\u63a8\u5e7f\u6628\u65e5\u6570\u636e",
   checkingTabs: "\u6b63\u5728\u68c0\u67e5\u5df2\u6253\u5f00\u7684\u6570\u636e\u9875...",
   requestingAllData: "\u6b63\u5728\u8bf7\u6c42\u4e09\u4e2a\u9875\u9762\u7684\u91c7\u96c6\u6570\u636e...",
+  requestingPromotionData: "\u6b63\u5728\u8bf7\u6c42\u63a8\u5e7f\u9875\u91c7\u96c6\u6570\u636e...",
   openingPages: "\u6b63\u5728\u6253\u5f00\u4e09\u4e2a\u6570\u636e\u9875...",
   refreshingPages: "\u6b63\u5728\u5237\u65b0\u4e09\u4e2a\u6570\u636e\u9875...",
   noContentResponse: "\u5185\u5bb9\u811a\u672c\u6ca1\u6709\u8fd4\u56de\u7ed3\u679c\u3002",
@@ -61,7 +75,8 @@ const TEXT = {
   goodsSummary: "\u5546\u54c1\u9875\u6982\u8981",
   promotionSummary: "\u63a8\u5e7f\u9875\u6982\u8981",
   pagesOpened: "\u4e09\u4e2a\u9875\u9762\u5df2\u6253\u5f00\u3002",
-  pagesRefreshed: "\u4e09\u4e2a\u9875\u9762\u5df2\u53d1\u8d77\u5237\u65b0\u3002"
+  pagesRefreshed: "\u4e09\u4e2a\u9875\u9762\u5df2\u53d1\u8d77\u5237\u65b0\u3002",
+  promotionScriptOutdated: "\u63a8\u5e7f\u9875\u4ecd\u5728\u4f7f\u7528\u65e7\u91c7\u96c6\u811a\u672c\uff0c\u8bf7\u70b9\u51fb\u201c\u5237\u65b0\u4e09\u4e2a\u9875\u9762\u201d\u540e\u91cd\u65b0\u5bfc\u51fa\u3002"
 };
 
 function setStatus(message) {
@@ -71,6 +86,7 @@ function setStatus(message) {
 function setButtonsDisabled(disabled) {
   openPagesButton.disabled = disabled;
   refreshPagesButton.disabled = disabled;
+  exportPromotionButton.disabled = disabled;
   exportButton.disabled = disabled;
 }
 
@@ -150,22 +166,61 @@ function buildMetricRows(payloads) {
   return rows;
 }
 
-function downloadCsv(payloads) {
-  const rows = buildMetricRows(payloads);
+function buildPromotionRows(promotionPayload, tradePayload) {
+  const marketingSpendRaw = promotionPayload?.metrics?.marketingSpend?.raw || "";
+  const netGmvRaw = promotionPayload?.metrics?.netGmv?.raw || "";
+  const actualRoiRaw = promotionPayload?.metrics?.actualRoi?.raw || "";
+  const orderCountRaw = promotionPayload?.metrics?.orderCount?.raw || "";
+  const netCostPerOrderRaw = promotionPayload?.metrics?.netCostPerOrder?.raw || "";
+  const impressionRaw = promotionPayload?.metrics?.impression?.raw || "";
+  const clickRaw = promotionPayload?.metrics?.click?.raw || "";
+  const clickConversionRateRaw = promotionPayload?.metrics?.clickConversionRate?.raw || "";
+
+  return [
+    TEXT.promotionCsvHeaders,
+    [
+      formatDataDate(promotionPayload?.capturedAt || tradePayload?.capturedAt || ""),
+      marketingSpendRaw,
+      netGmvRaw,
+      actualRoiRaw,
+      orderCountRaw,
+      netCostPerOrderRaw,
+      impressionRaw,
+      clickRaw,
+      clickConversionRateRaw
+    ]
+  ];
+}
+
+function validatePromotionExportPayload(promotionPayload) {
+  const requiredMetricKeys = [
+    "marketingSpend",
+    "netGmv",
+    "actualRoi",
+    "orderCount",
+    "netCostPerOrder",
+    "impression",
+    "click",
+    "clickConversionRate"
+  ];
+  const missingMetrics = requiredMetricKeys.filter((key) => !promotionPayload?.metrics?.[key]);
+  if (missingMetrics.length > 0) {
+    throw new Error(TEXT.promotionScriptOutdated);
+  }
+}
+
+function downloadCsv(rows, filePrefix, capturedAt) {
   const blob = new Blob(["\uFEFF" + createCsv(rows)], {
     type: "text/csv;charset=utf-8"
   });
   const url = URL.createObjectURL(blob);
-  const latestPayload = [...payloads]
-    .sort((left, right) => left.capturedAt.localeCompare(right.capturedAt))
-    .at(-1);
-  const stamp = (latestPayload?.capturedAt || new Date().toISOString())
+  const stamp = (capturedAt || new Date().toISOString())
     .replace(/[:T]/g, "-")
     .replace(/\..+$/, "");
 
   chrome.downloads.download({
     url,
-    filename: `${TEXT.exportFilePrefix}-${stamp}.csv`,
+    filename: `${filePrefix}-${stamp}.csv`,
     saveAs: true
   }, () => {
     URL.revokeObjectURL(url);
@@ -405,7 +460,52 @@ async function handleExport() {
     }
 
     setStatus(statusLines.join("\n"));
-    downloadCsv(payloads);
+    const latestPayload = [...payloads]
+      .sort((left, right) => left.capturedAt.localeCompare(right.capturedAt))
+      .at(-1);
+    downloadCsv(buildMetricRows(payloads), TEXT.exportFilePrefix, latestPayload?.capturedAt || "");
+  } catch (error) {
+    setStatus(`${TEXT.failed}\n${error.message}`);
+  } finally {
+    setButtonsDisabled(false);
+  }
+}
+
+async function handlePromotionExport() {
+  setButtonsDisabled(true);
+  setStatus(TEXT.requestingPromotionData);
+
+  try {
+    const supportedTabs = await getSupportedTabs();
+    const pageTabs = pickTabsByPage(supportedTabs);
+    const promotionTab = pageTabs.get("promotion");
+    if (!promotionTab) {
+      throw new Error(TEXT.missingPromotionPage);
+    }
+
+    const promotionPayload = await extractFromTab(promotionTab, PAGE_ORDER.find((page) => page.id === "promotion"));
+    validatePromotionExportPayload(promotionPayload);
+    let tradePayload = null;
+    const tradeTab = pageTabs.get("trade");
+    if (tradeTab) {
+      tradePayload = await extractFromTab(tradeTab, PAGE_ORDER.find((page) => page.id === "trade"));
+    }
+
+    const statusLines = [
+      TEXT.success,
+      TEXT.promotionSummary,
+      formatMetricSummary(promotionPayload),
+      ...formatSuccessDebug(promotionPayload)
+    ];
+    if (!tradePayload) {
+      tradePayload = null;
+    }
+    setStatus(statusLines.join("\n"));
+    downloadCsv(
+      buildPromotionRows(promotionPayload, tradePayload),
+      TEXT.promotionExportFilePrefix,
+      promotionPayload?.capturedAt || ""
+    );
   } catch (error) {
     setStatus(`${TEXT.failed}\n${error.message}`);
   } finally {
@@ -415,6 +515,7 @@ async function handleExport() {
 
 openPagesButton.addEventListener("click", handleOpenPages);
 refreshPagesButton.addEventListener("click", handleRefreshPages);
+exportPromotionButton.addEventListener("click", handlePromotionExport);
 exportButton.addEventListener("click", handleExport);
 
 document.addEventListener("DOMContentLoaded", async () => {
