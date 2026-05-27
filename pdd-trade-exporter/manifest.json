@@ -9,7 +9,8 @@
     "tabs"
   ],
   "host_permissions": [
-    "https://mms.pinduoduo.com/*"
+    "https://mms.pinduoduo.com/*",
+    "https://yingxiao.pinduoduo.com/*"
   ],
   "action": {
     "default_title": "\u62fc\u591a\u591a\u4ea4\u6613\u6570\u636e\u5bfc\u51fa\u52a9\u624b",
@@ -19,7 +20,8 @@
     {
       "matches": [
         "https://mms.pinduoduo.com/sycm/stores_data/operation*",
-        "https://mms.pinduoduo.com/sycm/goods_effect*"
+        "https://mms.pinduoduo.com/sycm/goods_effect*",
+        "https://yingxiao.pinduoduo.com/goods/promotion/list*"
       ],
       "js": [
         "content.js"
@@ -29,7 +31,8 @@
     {
       "matches": [
         "https://mms.pinduoduo.com/sycm/stores_data/operation*",
-        "https://mms.pinduoduo.com/sycm/goods_effect*"
+        "https://mms.pinduoduo.com/sycm/goods_effect*",
+        "https://yingxiao.pinduoduo.com/goods/promotion/list*"
       ],
       "js": [
         "page-main.js"

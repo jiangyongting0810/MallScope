@@ -59,6 +59,18 @@ const PAGE_CONFIGS = [
         fields: ["gpv", "goodsGpv", "viewCnt", "viewCount", "goodsViewCnt", "goodsViewCount"]
       }
     ]
+  },
+  {
+    id: "promotion",
+    urlPrefix: "https://yingxiao.pinduoduo.com/goods/promotion/list",
+    apiPath: "/mms-gateway/poseidon/api/report/queryHourlyRangeReport",
+    displayName: "\u63a8\u5e7f\u6570\u636e\u9875",
+    responseMode: "promotionDailyReport",
+    metrics: [
+      { key: "marketingSpend", label: "\u6210\u4ea4\u8425\u9500\u82b1\u8d39(\u5143)", type: "number", field: "orderMarketingSpend" },
+      { key: "netGmv", label: "\u51c0\u4ea4\u6613\u989d(\u5143)", type: "number", field: "netGmv" },
+      { key: "netRoi", label: "\u5b9e\u9645\u51c0\u6295\u4ea7\u6bd4", type: "number", field: "orderSpendNetRoi" }
+    ]
   }
 ];
 
@@ -116,7 +128,8 @@ function resolveMetricValue(entry, metric) {
   }
 
   for (const field of getMetricFields(metric)) {
-    const value = entry?.[field];
+    const sourceValue = entry?.[field];
+    const value = sourceValue && typeof sourceValue === "object" ? sourceValue.value : sourceValue;
     if (parseMetricValue(value) !== null) {
       return {
         field,
@@ -157,8 +170,8 @@ function selectLatestYesterdayEntry(entries, metricFields) {
 }
 
 function selectYesterdayEntry(config, result) {
-  if (config.responseMode === "summaryYesterdayObject") {
-    const candidate = result?.yesData;
+  if (config.responseMode === "summaryYesterdayObject" || config.responseMode === "promotionDailyReport") {
+    const candidate = config.responseMode === "promotionDailyReport" ? result?.dailyReport : result?.yesData;
     if (!candidate || typeof candidate !== "object") {
       return null;
     }
@@ -471,7 +484,38 @@ function storeTradeSnapshot(detail) {
   }
 }
 
-function storeGoodsSnapshot(config, detail) {
+function parseRequestBody(requestBody) {
+  if (typeof requestBody !== "string") {
+    return requestBody && typeof requestBody === "object" ? requestBody : null;
+  }
+
+  try {
+    return JSON.parse(requestBody);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function getYesterdayDateText() {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const year = yesterday.getFullYear();
+  const month = String(yesterday.getMonth() + 1).padStart(2, "0");
+  const day = String(yesterday.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isYesterdayPromotionRequest(detail) {
+  const requestBody = parseRequestBody(detail.requestBody);
+  const requestDate = requestBody?.startDate?.slice(0, 10);
+  return !requestDate || requestDate === getYesterdayDateText();
+}
+
+function storeSummarySnapshot(config, detail) {
+  if (config.id === "promotion" && !isYesterdayPromotionRequest(detail)) {
+    return;
+  }
+
   const result = detail.payload?.result;
   const latestYesterdayEntry = selectYesterdayEntry(config, result);
   if (!latestYesterdayEntry) {
@@ -572,7 +616,7 @@ function storePageSnapshot(detail) {
     return;
   }
 
-  storeGoodsSnapshot(config, detail);
+  storeSummarySnapshot(config, detail);
 }
 
 function getDebugData() {

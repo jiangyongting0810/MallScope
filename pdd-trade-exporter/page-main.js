@@ -2,7 +2,8 @@
   const TARGET_API_PARTS = [
     "/api/mallTrade/queryMallTradeList",
     "/api/mallTrade/getMallTradeInfo",
-    "/sydney/api/goodsDataShow/queryGoodsPageOverviewForMms"
+    "/sydney/api/goodsDataShow/queryGoodsPageOverviewForMms",
+    "/mms-gateway/poseidon/api/report/queryHourlyRangeReport"
   ];
   const MESSAGE_TYPE = "PDD_TRADE_EXPORTER_DATA";
 
@@ -18,7 +19,7 @@
     return TARGET_API_PARTS.some((part) => url?.includes(part));
   }
 
-  function dispatchPayload(source, url, payload) {
+  function dispatchPayload(source, url, payload, requestBody) {
     if (!isTargetRequest(url)) {
       return;
     }
@@ -27,6 +28,7 @@
       source,
       url,
       payload,
+      requestBody,
       capturedAt: new Date().toISOString()
     });
     if (!detail) {
@@ -61,7 +63,7 @@
         const text = await clonedResponse.text();
         const payload = tryParseJson(text);
         if (payload) {
-          dispatchPayload("fetch", requestUrl, payload);
+          dispatchPayload("fetch", requestUrl, payload, args[1]?.body || null);
         }
       } catch (_error) {
         // Ignore instrumentation failures and preserve the original request.
@@ -89,7 +91,7 @@
 
         const payload = tryParseJson(responseText);
         if (payload) {
-          dispatchPayload("xhr", this.__pddTradeExporterUrl, payload);
+          dispatchPayload("xhr", this.__pddTradeExporterUrl, payload, args[0] || null);
         }
       } catch (_error) {
         // Ignore instrumentation failures and preserve the original request.

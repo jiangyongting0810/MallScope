@@ -11,6 +11,11 @@ const PAGE_ORDER = [
     id: "goods",
     name: "\u5546\u54c1\u6570\u636e\u9875",
     prefix: "https://mms.pinduoduo.com/sycm/goods_effect"
+  },
+  {
+    id: "promotion",
+    name: "\u63a8\u5e7f\u6570\u636e\u9875",
+    prefix: "https://yingxiao.pinduoduo.com/goods/promotion/list"
   }
 ];
 
@@ -25,11 +30,14 @@ const TEXT = {
     "\u8bbf\u5ba2\u4ef7\u503c",
     "\u6210\u4ea4\u8f6c\u5316\u7387",
     "\u5546\u54c1\u8bbf\u5ba2\u6570",
-    "\u5546\u54c1\u6d4f\u89c8\u91cf"
+    "\u5546\u54c1\u6d4f\u89c8\u91cf",
+    "\u6210\u4ea4\u8425\u9500\u82b1\u8d39(\u5143)",
+    "\u51c0\u4ea4\u6613\u989d(\u5143)",
+    "\u5b9e\u9645\u51c0\u6295\u4ea7\u6bd4"
   ],
   exportFilePrefix: "\u62fc\u591a\u591a\u6628\u65e5\u6570\u636e",
   checkingTabs: "\u6b63\u5728\u68c0\u67e5\u5df2\u6253\u5f00\u7684\u6570\u636e\u9875...",
-  requestingAllData: "\u6b63\u5728\u8bf7\u6c42\u4e24\u4e2a\u9875\u9762\u7684\u91c7\u96c6\u6570\u636e...",
+  requestingAllData: "\u6b63\u5728\u8bf7\u6c42\u4e09\u4e2a\u9875\u9762\u7684\u91c7\u96c6\u6570\u636e...",
   noContentResponse: "\u5185\u5bb9\u811a\u672c\u6ca1\u6709\u8fd4\u56de\u7ed3\u679c\u3002",
   extractionFailed: "\u91c7\u96c6\u5931\u8d25\u3002",
   success: "\u91c7\u96c6\u6210\u529f\uff0c\u6b63\u5728\u51c6\u5907\u5bfc\u51fa\u3002",
@@ -41,11 +49,13 @@ const TEXT = {
   targetMessagesSeen: "\u547d\u4e2d\u76ee\u6807\u63a5\u53e3\u6570",
   snapshotPages: "\u5df2\u6355\u83b7\u9875\u9762",
   currentPage: "\u5f53\u524d\u9875\u9762",
-  openBothPages: "\u8bf7\u540c\u65f6\u6253\u5f00\u4ea4\u6613\u6570\u636e\u9875\u548c\u5546\u54c1\u6570\u636e\u9875\uff0c\u5e76\u5404\u81ea\u5237\u65b0\u4e00\u6b21\u540e\u518d\u5bfc\u51fa\u3002",
+  openAllPages: "\u8bf7\u540c\u65f6\u6253\u5f00\u4ea4\u6613\u6570\u636e\u9875\u3001\u5546\u54c1\u6570\u636e\u9875\u548c\u63a8\u5e7f\u6570\u636e\u9875\uff0c\u5e76\u5404\u81ea\u5237\u65b0\u4e00\u6b21\u540e\u518d\u5bfc\u51fa\u3002",
   missingTradePage: "\u672a\u627e\u5230\u5df2\u6253\u5f00\u7684\u4ea4\u6613\u6570\u636e\u9875\u6807\u7b7e\u9875\u3002",
   missingGoodsPage: "\u672a\u627e\u5230\u5df2\u6253\u5f00\u7684\u5546\u54c1\u6570\u636e\u9875\u6807\u7b7e\u9875\u3002",
+  missingPromotionPage: "\u672a\u627e\u5230\u5df2\u6253\u5f00\u7684\u63a8\u5e7f\u6570\u636e\u9875\u6807\u7b7e\u9875\u3002",
   tradeSummary: "\u4ea4\u6613\u9875\u6982\u8981",
-  goodsSummary: "\u5546\u54c1\u9875\u6982\u8981"
+  goodsSummary: "\u5546\u54c1\u9875\u6982\u8981",
+  promotionSummary: "\u63a8\u5e7f\u9875\u6982\u8981"
 };
 
 function setStatus(message) {
@@ -78,6 +88,7 @@ function buildMetricRows(payloads) {
   const rows = [TEXT.csvHeaders];
   const tradePayload = payloads.find((payload) => payload.debug?.configId === "trade") || null;
   const goodsPayload = payloads.find((payload) => payload.debug?.configId === "goods") || null;
+  const promotionPayload = payloads.find((payload) => payload.debug?.configId === "promotion") || null;
   const baseCapturedAt = tradePayload?.capturedAt || goodsPayload?.capturedAt || "";
 
   rows.push([
@@ -88,7 +99,10 @@ function buildMetricRows(payloads) {
     tradePayload?.metrics?.visitorValue?.raw || "",
     tradePayload?.metrics?.conversionRate?.raw || "",
     goodsPayload?.metrics?.visitorCount?.raw || "",
-    goodsPayload?.metrics?.goodsViewCount?.raw || ""
+    goodsPayload?.metrics?.goodsViewCount?.raw || "",
+    promotionPayload?.metrics?.marketingSpend?.raw || "",
+    promotionPayload?.metrics?.netGmv?.raw || "",
+    promotionPayload?.metrics?.netRoi?.raw || ""
   ]);
 
   return rows;
@@ -222,8 +236,8 @@ async function collectAllPageData() {
   const supportedTabs = await getSupportedTabs();
   const pageTabs = pickTabsByPage(supportedTabs);
 
-  if (!pageTabs.get("trade") && !pageTabs.get("goods")) {
-    throw new Error(TEXT.openBothPages);
+  if (!pageTabs.get("trade") && !pageTabs.get("goods") && !pageTabs.get("promotion")) {
+    throw new Error(TEXT.openAllPages);
   }
 
   if (!pageTabs.get("trade")) {
@@ -232,6 +246,10 @@ async function collectAllPageData() {
 
   if (!pageTabs.get("goods")) {
     throw new Error(TEXT.missingGoodsPage);
+  }
+
+  if (!pageTabs.get("promotion")) {
+    throw new Error(TEXT.missingPromotionPage);
   }
 
   const payloads = [];
@@ -252,7 +270,12 @@ async function handleExport() {
     const statusLines = [TEXT.success];
 
     for (const payload of payloads) {
-      statusLines.push(payload.debug?.configId === "trade" ? TEXT.tradeSummary : TEXT.goodsSummary);
+      const summaryLabel = {
+        trade: TEXT.tradeSummary,
+        goods: TEXT.goodsSummary,
+        promotion: TEXT.promotionSummary
+      }[payload.debug?.configId] || payload.pageName;
+      statusLines.push(summaryLabel);
       statusLines.push(formatMetricSummary(payload));
       statusLines.push(...formatSuccessDebug(payload));
     }

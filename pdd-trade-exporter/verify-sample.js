@@ -146,9 +146,62 @@ function verifyGoodsAliases() {
   }
 }
 
+function verifyPromotionDailyReport() {
+  const content = loadContentExports("https://yingxiao.pinduoduo.com/goods/promotion/list");
+  content.storePageSnapshot({
+    url: "https://yingxiao.pinduoduo.com/mms-gateway/poseidon/api/report/queryHourlyRangeReport",
+    payload: {
+      result: {
+        dailyReport: {
+          orderMarketingSpend: { value: "141.91" },
+          netGmv: { value: "382.00" },
+          orderSpendNetRoi: { value: "2.69" }
+        }
+      }
+    },
+    capturedAt: "2026-05-27T12:42:02.222Z",
+    source: "synthetic-promotion-sample"
+  });
+  content.storePageSnapshot({
+    url: "https://yingxiao.pinduoduo.com/mms-gateway/poseidon/api/report/queryHourlyRangeReport",
+    requestBody: JSON.stringify({ startDate: "2099-01-01 00:00:00" }),
+    payload: {
+      result: {
+        dailyReport: {
+          orderMarketingSpend: { value: "999.99" },
+          netGmv: { value: "999.99" },
+          orderSpendNetRoi: { value: "9.99" }
+        }
+      }
+    },
+    capturedAt: "2099-01-01T12:42:02.222Z",
+    source: "synthetic-promotion-non-yesterday"
+  });
+
+  const result = content.extractCurrentPageData();
+  console.log(JSON.stringify({
+    case: "promotion-daily-report",
+    metrics: result.metrics,
+    debug: result.debug
+  }, null, 2));
+
+  if (result.metrics.marketingSpend.raw !== "141.91") {
+    throw new Error(`成交营销花费校验失败，期望 141.91，实际 ${result.metrics.marketingSpend.raw}`);
+  }
+
+  if (result.metrics.netGmv.raw !== "382.00") {
+    throw new Error(`净交易额校验失败，期望 382.00，实际 ${result.metrics.netGmv.raw}`);
+  }
+
+  if (result.metrics.netRoi.raw !== "2.69") {
+    throw new Error(`实际净投产比校验失败，期望 2.69，实际 ${result.metrics.netRoi.raw}`);
+  }
+}
+
 function main() {
   verifyTradeSample();
   verifyGoodsAliases();
+  verifyPromotionDailyReport();
 }
 
 main();
