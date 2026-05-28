@@ -71,7 +71,12 @@ const PAGE_CONFIGS = [
       { key: "netGmv", label: "\u51c0\u4ea4\u6613\u989d(\u5143)", type: "number", field: "netGmv" },
       { key: "netRoi", label: "\u5b9e\u9645\u51c0\u6295\u4ea7\u6bd4", type: "number", field: "orderSpendNetRoi" },
       { key: "actualRoi", label: "\u5b9e\u9645\u6295\u4ea7\u6bd4", type: "number", field: "orderSpendRoiUnified" },
-      { key: "orderCount", label: "\u6210\u4ea4\u7b14\u6570", type: "count", field: "orderNum" },
+      {
+        key: "orderCount",
+        label: "\u51c0\u6210\u4ea4\u7b14\u6570",
+        type: "count",
+        fields: ["orderSpendNetOrderNum", "orderSpendNetOrderCount", "netOrderNum", "netOrderCount"]
+      },
       { key: "netCostPerOrder", label: "\u6bcf\u7b14\u51c0\u6210\u4ea4\u82b1\u8d39(\u5143)", type: "number", field: "orderSpendNetCostPerOrder" },
       { key: "impression", label: "\u66dd\u5149\u91cf", type: "count", field: "impression" },
       { key: "click", label: "\u70b9\u51fb\u91cf", type: "count", field: "click" },
@@ -532,11 +537,16 @@ function storeSummarySnapshot(config, detail) {
   const resolvedFields = {};
   for (const metric of config.metrics) {
     const resolved = resolveMetricValue(latestYesterdayEntry, metric);
+    const sourceValue = config.id === "promotion" && metric.key === "orderCount" && parseMetricValue(resolved.value) === null
+      ? derivePromotionNetOrderCount(latestYesterdayEntry)
+      : resolved.value;
     metrics[metric.key] = {
       label: metric.label,
-      ...formatMetricValue(metric.type, resolved.value)
+      ...formatMetricValue(metric.type, sourceValue)
     };
-    resolvedFields[metric.key] = resolved.field;
+    resolvedFields[metric.key] = parseMetricValue(resolved.value) === null && sourceValue !== resolved.value
+      ? "derived:orderMarketingSpend/orderSpendNetCostPerOrder"
+      : resolved.field;
   }
 
   pageSnapshots.set(config.id, {
@@ -584,6 +594,17 @@ function formatMetricValue(type, value) {
     raw: parsedValue.toFixed(2),
     value: parsedValue
   };
+}
+
+function derivePromotionNetOrderCount(entry) {
+  const marketingSpend = parseMetricValue(resolveMetricValue(entry, { field: "orderMarketingSpend" }).value);
+  const netCostPerOrder = parseMetricValue(resolveMetricValue(entry, { field: "orderSpendNetCostPerOrder" }).value);
+  if (marketingSpend === null || netCostPerOrder === null || netCostPerOrder === 0) {
+    return null;
+  }
+
+  const derivedCount = Math.round(marketingSpend / netCostPerOrder);
+  return Number.isFinite(derivedCount) && derivedCount >= 0 ? derivedCount : null;
 }
 
 function deriveVisitorValue(entry) {

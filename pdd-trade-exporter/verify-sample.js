@@ -157,7 +157,7 @@ function verifyPromotionDailyReport() {
           netGmv: { value: "382.00" },
           orderSpendNetRoi: { value: "2.69" },
           orderSpendRoiUnified: { value: "2.69" },
-          orderNum: 3,
+          orderNum: 5,
           orderSpendNetCostPerOrder: { value: "47.30" },
           impression: 784,
           click: 24,
@@ -208,7 +208,7 @@ function verifyPromotionDailyReport() {
   }
 
   if (result.metrics.orderCount.raw !== "3") {
-    throw new Error(`成交笔数校验失败，期望 3，实际 ${result.metrics.orderCount.raw}`);
+    throw new Error(`净成交笔数校验失败，期望 3，实际 ${result.metrics.orderCount.raw}`);
   }
 
   if (result.metrics.netCostPerOrder.raw !== "47.30") {

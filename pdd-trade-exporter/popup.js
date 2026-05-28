@@ -1,6 +1,5 @@
 const openPagesButton = document.getElementById("openPagesButton");
 const refreshPagesButton = document.getElementById("refreshPagesButton");
-const exportPromotionButton = document.getElementById("exportPromotionButton");
 const exportButton = document.getElementById("exportButton");
 const statusNode = document.getElementById("status");
 
@@ -23,7 +22,6 @@ const PAGE_ORDER = [
 ];
 
 const SUPPORTED_URL_PREFIXES = PAGE_ORDER.map((page) => page.prefix);
-const PAGE_BY_ID = new Map(PAGE_ORDER.map((page) => [page.id, page]));
 
 const TEXT = {
   csvHeaders: [
@@ -36,7 +34,7 @@ const TEXT = {
     "\u5546\u54c1\u8bbf\u5ba2\u6570",
     "\u5546\u54c1\u6d4f\u89c8\u91cf",
     "\u6210\u4ea4\u8425\u9500\u82b1\u8d39(\u5143)",
-    "\u5b9e\u9645\u51c0\u6295\u4ea7\u6bd4",
+    "\u5b9e\u9645\u6295\u4ea7\u6bd4",
     "\u5e7f\u544a\u8d39\u7387"
   ],
   promotionCsvHeaders: [
@@ -44,17 +42,16 @@ const TEXT = {
     "\u6210\u4ea4\u8425\u9500\u82b1\u8d39(\u5143)",
     "\u51c0\u4ea4\u6613\u989d(\u5143)",
     "\u5b9e\u9645\u6295\u4ea7\u6bd4",
-    "\u6210\u4ea4\u7b14\u6570",
+    "\u51c0\u6210\u4ea4\u7b14\u6570",
     "\u6bcf\u7b14\u51c0\u6210\u4ea4\u82b1\u8d39(\u5143)",
     "\u66dd\u5149\u91cf",
     "\u70b9\u51fb\u91cf",
     "\u70b9\u51fb\u8f6c\u5316\u7387"
   ],
+  promotionSectionHeader: "\u63a8\u5e7f\u6570\u636e",
   exportFilePrefix: "\u62fc\u591a\u591a\u6628\u65e5\u6570\u636e",
-  promotionExportFilePrefix: "\u62fc\u591a\u591a\u63a8\u5e7f\u6628\u65e5\u6570\u636e",
   checkingTabs: "\u6b63\u5728\u68c0\u67e5\u5df2\u6253\u5f00\u7684\u6570\u636e\u9875...",
   requestingAllData: "\u6b63\u5728\u8bf7\u6c42\u4e09\u4e2a\u9875\u9762\u7684\u91c7\u96c6\u6570\u636e...",
-  requestingPromotionData: "\u6b63\u5728\u8bf7\u6c42\u63a8\u5e7f\u9875\u91c7\u96c6\u6570\u636e...",
   openingPages: "\u6b63\u5728\u6253\u5f00\u4e09\u4e2a\u6570\u636e\u9875...",
   refreshingPages: "\u6b63\u5728\u5237\u65b0\u4e09\u4e2a\u6570\u636e\u9875...",
   noContentResponse: "\u5185\u5bb9\u811a\u672c\u6ca1\u6709\u8fd4\u56de\u7ed3\u679c\u3002",
@@ -87,7 +84,6 @@ function setStatus(message) {
 function setButtonsDisabled(disabled) {
   openPagesButton.disabled = disabled;
   refreshPagesButton.disabled = disabled;
-  exportPromotionButton.disabled = disabled;
   exportButton.disabled = disabled;
 }
 
@@ -141,16 +137,16 @@ function formatAdRate(marketingSpendRaw, payAmountRaw) {
   return `${((marketingSpend / payAmount) * 100).toFixed(2)}%`;
 }
 
-function buildMetricRows(payloads) {
-  const rows = [TEXT.csvHeaders];
-  const tradePayload = payloads.find((payload) => payload.debug?.configId === "trade") || null;
-  const goodsPayload = payloads.find((payload) => payload.debug?.configId === "goods") || null;
-  const promotionPayload = payloads.find((payload) => payload.debug?.configId === "promotion") || null;
+function getPayloadByPage(payloads, pageId) {
+  return payloads.find((payload) => payload.debug?.configId === pageId) || null;
+}
+
+function buildMetricCells(tradePayload, goodsPayload, promotionPayload) {
   const baseCapturedAt = tradePayload?.capturedAt || goodsPayload?.capturedAt || "";
   const payAmountRaw = tradePayload?.metrics?.payAmount?.raw || "";
   const marketingSpendRaw = promotionPayload?.metrics?.marketingSpend?.raw || "";
 
-  rows.push([
+  return [
     formatDataDate(baseCapturedAt),
     payAmountRaw,
     tradePayload?.metrics?.payOrderCount?.raw || "",
@@ -160,14 +156,12 @@ function buildMetricRows(payloads) {
     goodsPayload?.metrics?.visitorCount?.raw || "",
     goodsPayload?.metrics?.goodsViewCount?.raw || "",
     marketingSpendRaw,
-    promotionPayload?.metrics?.netRoi?.raw || "",
+    promotionPayload?.metrics?.actualRoi?.raw || "",
     formatAdRate(marketingSpendRaw, payAmountRaw)
-  ]);
-
-  return rows;
+  ];
 }
 
-function buildPromotionRows(promotionPayload) {
+function buildPromotionCells(promotionPayload) {
   const marketingSpendRaw = promotionPayload?.metrics?.marketingSpend?.raw || "";
   const netGmvRaw = promotionPayload?.metrics?.netGmv?.raw || "";
   const actualRoiRaw = promotionPayload?.metrics?.actualRoi?.raw || "";
@@ -178,17 +172,35 @@ function buildPromotionRows(promotionPayload) {
   const clickConversionRateRaw = promotionPayload?.metrics?.clickConversionRate?.raw || "";
 
   return [
-    TEXT.promotionCsvHeaders,
+    formatDataDate(promotionPayload?.capturedAt || ""),
+    marketingSpendRaw,
+    netGmvRaw,
+    actualRoiRaw,
+    orderCountRaw,
+    netCostPerOrderRaw,
+    impressionRaw,
+    clickRaw,
+    clickConversionRateRaw
+  ];
+}
+
+function buildMetricRows(payloads) {
+  const tradePayload = getPayloadByPage(payloads, "trade");
+  const goodsPayload = getPayloadByPage(payloads, "goods");
+  const promotionPayload = getPayloadByPage(payloads, "promotion");
+
+  return [
     [
-      formatDataDate(promotionPayload?.capturedAt || ""),
-      marketingSpendRaw,
-      netGmvRaw,
-      actualRoiRaw,
-      orderCountRaw,
-      netCostPerOrderRaw,
-      impressionRaw,
-      clickRaw,
-      clickConversionRateRaw
+      ...TEXT.csvHeaders,
+      "",
+      TEXT.promotionSectionHeader,
+      ...TEXT.promotionCsvHeaders
+    ],
+    [
+      ...buildMetricCells(tradePayload, goodsPayload, promotionPayload),
+      "",
+      "",
+      ...buildPromotionCells(promotionPayload)
     ]
   ];
 }
@@ -436,6 +448,7 @@ async function handleExport() {
   try {
     setStatus(TEXT.requestingAllData);
     const payloads = await collectAllPageData();
+    validatePromotionExportPayload(getPayloadByPage(payloads, "promotion"));
     const statusLines = [TEXT.success];
 
     for (const payload of payloads) {
@@ -461,39 +474,8 @@ async function handleExport() {
   }
 }
 
-async function handlePromotionExport() {
-  setButtonsDisabled(true);
-  setStatus(TEXT.requestingPromotionData);
-
-  try {
-    const pageTabs = await getPageTabs();
-    const promotionPage = PAGE_BY_ID.get("promotion");
-    assertPagesOpen(pageTabs, [promotionPage]);
-    const promotionPayload = await extractFromTab(pageTabs.get("promotion"), promotionPage);
-    validatePromotionExportPayload(promotionPayload);
-
-    const statusLines = [
-      TEXT.success,
-      TEXT.promotionSummary,
-      formatMetricSummary(promotionPayload),
-      ...formatSuccessDebug(promotionPayload)
-    ];
-    setStatus(statusLines.join("\n"));
-    downloadCsv(
-      buildPromotionRows(promotionPayload),
-      TEXT.promotionExportFilePrefix,
-      promotionPayload?.capturedAt || ""
-    );
-  } catch (error) {
-    setStatus(`${TEXT.failed}\n${error.message}`);
-  } finally {
-    setButtonsDisabled(false);
-  }
-}
-
 openPagesButton.addEventListener("click", handleOpenPages);
 refreshPagesButton.addEventListener("click", handleRefreshPages);
-exportPromotionButton.addEventListener("click", handlePromotionExport);
 exportButton.addEventListener("click", handleExport);
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -508,7 +490,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     for (const page of PAGE_ORDER) {
       const tab = pageTabs.get(page.id);
-      if (!tab?.id) {
+      if (!tab) {
         statusLines.push(`${page.name}: ${TEXT.unknown}`);
         continue;
       }
